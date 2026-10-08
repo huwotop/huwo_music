@@ -20,6 +20,7 @@ var isScrolling = false; // 添加全局变量 isScrolling，默认为 false
 var scrollTimer = null; // 添加定时器变量
 var animationFrameId = null; // 添加变量用于跟踪动画帧ID
 var lyricClickBound = false; // 歌词点击监听是否已绑定（避免随切歌重复累积）
+var ASSET_VER = '20261008'; // 静态资源版本号：发版时与 index.html 中的 ?v= 同步修改
 
 if (typeof userId === 'undefined') {
   var userId = "8152976493"; // 替换为实际的默认值
@@ -68,9 +69,9 @@ function loadMusicScript() {
     localMusic.length === 0;
 
   if (useMeting) {
-    loadScript('./js/Meting.js');
+    loadScript('./js/Meting.js?v=' + ASSET_VER);
   } else {
-    loadScript('./js/localEngine.js');
+    loadScript('./js/localEngine.js?v=' + ASSET_VER);
     local = true;
   }
 }
@@ -252,7 +253,7 @@ var heo = {
   },
   setMediaMetadata: function (aplayerObj, isSongPlaying) {
     const audio = aplayerObj.list.audios[aplayerObj.list.index]
-    const coverUrl = audio.cover || './img/icon.webp';
+    const coverUrl = audio.cover || './img/icon.webp?v=' + ASSET_VER;
         const currentLrcElement = document.getElementById("heoMusic-page").querySelector(".aplayer-lrc-current");
     const currentLrcContent = currentLrcElement ? currentLrcElement.textContent : "";
     let songName, songArtist;

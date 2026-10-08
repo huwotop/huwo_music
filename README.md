@@ -81,24 +81,49 @@ var remoteMusic = "./musiclist.json"
 
 ### 部署到 Cloudflare Pages
 
-如果部署到 Cloudflare Pages，需要创建 `_headers` 文件以启用 Range 请求支持：
-
-1. 在项目根目录创建 `_headers` 文件：
+项目通过 `_headers` 文件配置响应头（Range 请求支持 + 缓存策略）：
 
 ```
 /*
   Accept-Ranges: bytes
+
+/music/*
+  Cache-Control: public, max-age=31536000
+
+/img/*
+  Cache-Control: public, max-age=604800
+
+/js/*
+  Cache-Control: public, max-age=0, must-revalidate
+
+/css/*
+  Cache-Control: public, max-age=0, must-revalidate
 ```
 
-2. 将项目上传到 GitHub
+**测试验证**：打开开发者工具 → Network → 播放一首歌曲 → 点击音频请求，确认响应头包含 `Accept-Ranges: bytes`。
 
-3. 在 Cloudflare Pages 中配置并部署项目
+> 音频文件必须支持 Range 请求，否则进度条拖动会失效。
 
-4. **测试验证**：
-   - 打开浏览器，按 F12 打开开发者工具
-   - 切换到 Network 面板
-   - 播放一首歌曲，点击音频请求
-   - 在 Response Headers 中确认包含 `Accept-Ranges: bytes`
+### 发版与缓存（重要）
+
+CDN 与浏览器会按 `Cache-Control` 长期缓存 `css` / `js` / `img`。**只改文件内容而不改引用地址，线上可能仍显示旧版本。**
+
+因此所有本地静态资源引用都带版本号 `?v=20261008`。发版时把它统一改成新值（例如当天日期）即可：
+
+| 文件 | 需要修改的位置 |
+| :--- | :--- |
+| `index.html` | 全部 `?v=`（css / js / img / manifest） |
+| `manifest.json` | `icons[].src` |
+| `css/main.css` | `#music_bg` 的 `background-image` |
+| `js/main.js` | 顶部 `ASSET_VER` 常量 |
+
+> 该版本号用于「击穿」已被 CDN 和浏览器缓存的文件。历史教训：曾经因为图标缺失期间 CDN 把 HTML 回退页当作图标缓存了 1 年，导致 favicon 长期损坏。
+
+如果改了文件却忘记改版本号，可在 Cloudflare 后台执行一次清理：
+
+**Cloudflare Dashboard → 选择域名 → Caching → Configuration → Purge Everything**
+
+注意：清理只影响 CDN 边缘节点，**已经访问过站点的浏览器**仍会用本地缓存。要立刻生效仍需依赖 `?v=` 版本号变更。
 
 ## 项目结构
 
@@ -119,6 +144,7 @@ var remoteMusic = "./musiclist.json"
 ├── config.js                 # 歌单来源配置（remoteMusic）
 ├── generate_musiclist.py     # 扫描 music/ 生成 musiclist.json
 ├── index.html                # 主页面
+├── 404.html                  # 未找到页面（避免软 404 污染缓存）
 ├── musiclist.json            # 自动生成的音乐列表
 ├── _headers                  # Cloudflare Pages 响应头（Range 支持 + 缓存）
 └── README.md                 # 项目说明

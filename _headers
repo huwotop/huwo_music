@@ -1,3 +1,15 @@
+# Cloudflare Pages / Netlify 响应头配置
+#
+# 缓存策略说明：
+# - /music/* 音频文件体积大且内容不变，长缓存（1 年）。
+# - /img/*   图标等资源保留 7 天；替换图片后请同步修改引用处的 ?v= 版本号，
+#            否则 CDN 与浏览器仍会用旧图（历史上曾把图标缓存成 HTML 达 1 年）。
+# - /js/*、/css/* 不缓存，靠 ETag 协商缓存（304）。这样发版立即可见，
+#            不会再出现「代码已更新但线上仍是旧版」的情况。
+#
+# 注意：本文件修改后需重新部署才会生效，且已缓存的旧响应会按旧 TTL 继续存在，
+# 首次生效时需在 Cloudflare 后台执行一次 Purge Everything。
+
 /*
   Accept-Ranges: bytes
 
@@ -6,10 +18,10 @@
   Access-Control-Allow-Origin: *
 
 /img/*
-  Cache-Control: public, max-age=31536000
+  Cache-Control: public, max-age=604800
 
 /js/*
-  Cache-Control: public, max-age=86400
+  Cache-Control: public, max-age=0, must-revalidate
 
 /css/*
-  Cache-Control: public, max-age=86400
+  Cache-Control: public, max-age=0, must-revalidate

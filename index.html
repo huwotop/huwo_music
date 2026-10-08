@@ -5,24 +5,32 @@
   <meta http-equiv="X-UA-Compatible" content="IE=edge">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Huwo Music - 私人音乐播放器</title>
-  <link rel="stylesheet" type="text/css" href="./css/APlayer.css">
-  <link rel="stylesheet" type="text/css" href="./css/main.css">
-  <link rel="icon" type="image/x-icon" href="./img/icon.webp">
-  <link rel="apple-touch-icon" href="./img/icon-r.webp">
+  <!--
+    静态资源版本号（?v=）
+    ------------------------------------------------------------------
+    CDN 与浏览器会按 Cache-Control 长期缓存 css/js/img，直接改文件内容
+    不会立即生效。发版时把下面所有 ?v= 的值统一改掉（例如改成当天日期），
+    引用地址变化即可让 CDN 与浏览器立刻拉取新文件。
+    需要同步修改的位置：index.html / manifest.json / css/main.css / js/main.js
+  -->
+  <link rel="stylesheet" type="text/css" href="./css/APlayer.css?v=20261008">
+  <link rel="stylesheet" type="text/css" href="./css/main.css?v=20261008">
+  <link rel="icon" type="image/x-icon" href="./img/icon.webp?v=20261008">
+  <link rel="apple-touch-icon" href="./img/icon-r.webp?v=20261008">
   <meta name="apple-mobile-web-app-title" content="音乐">
-  <link rel="bookmark" href="./img/icon.webp">
-  <link rel="apple-touch-icon-precomposed" sizes="180x180" href="./img/icon-r.webp">
+  <link rel="bookmark" href="./img/icon.webp?v=20261008">
+  <link rel="apple-touch-icon-precomposed" sizes="180x180" href="./img/icon-r.webp?v=20261008">
   <meta name="description" content="个人音乐收藏夹。">
-  <link rel="manifest" href="./manifest.json">
+  <link rel="manifest" href="./manifest.json?v=20261008">
   <meta name="theme-color" content="#000000">
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://static.cloudflareinsights.com https://tj.huwo.top; style-src 'self' 'unsafe-inline'; img-src *; media-src *; connect-src *;">
 </head>
 <body>
 <div id="heoMusic-page">
 </div>
-<script src="./config.js"></script>
-<script src="./js/APlayer.min.js"></script>
-<script async src="./js/main.js"></script>
+<script src="./config.js?v=20261008"></script>
+<script src="./js/APlayer.min.js?v=20261008"></script>
+<script async src="./js/main.js?v=20261008"></script>
 <script defer src="https://tj.huwo.top/script.js" data-website-id="7c831ba2-cdfb-4aab-a0ac-f4df705deff7"></script>
 </body>
 </html>
