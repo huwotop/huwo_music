@@ -94,10 +94,10 @@ var remoteMusic = "./musiclist.json"
   Cache-Control: public, max-age=604800
 
 /js/*
-  Cache-Control: public, max-age=0, must-revalidate
+  Cache-Control: public, max-age=31536000, immutable
 
 /css/*
-  Cache-Control: public, max-age=0, must-revalidate
+  Cache-Control: public, max-age=31536000, immutable
 
 # HTML：no-transform 阻止 Cloudflare 注入 JS Detections
 /
@@ -128,6 +128,30 @@ JSD 由 Bot Fight Mode 自动开启，官方文档明确说明 **cannot be disab
 官方给出的退出方式就是 `no-transform`：当响应包含该指令时，Cloudflare 不再注入 JSD 脚本（[官方文档](https://developers.cloudflare.com/cloudflare-challenges/challenge-types/javascript-detections/)）。代价是 Cloudflare 可能跳过对 HTML 的压缩（首页约 2.9 KB，影响可忽略），且这些页面的 `js_detection.passed` 会变为 `missing`——而它原本因被 CSP 拦截就已是拿不到的状态，无实际损失。
 
 > 另注：官方文档说明 JSD **不支持通过 `<meta>` 标签设置的 CSP nonce**，因此「改用 nonce 放行」在本项目走不通（本项目的 CSP 写在 `<meta>` 里）。
+
+#### 音频文件需要额外配置 Cache Rule（否则播放很慢）
+
+Cloudflare 只缓存**内置扩展名白名单**内的文件。`.jpg` / `.webp` / `.css` / `.js` 都在白名单里，但 **`.m4a`（以及 `.mp3`）不在**。所以在 `_headers` 里给 `/music/*` 写 `Cache-Control` 只影响浏览器缓存，**不影响 Cloudflare 边缘缓存**：
+
+| 资源 | `cf-cache-status` | 结果 |
+| :--- | :--- | :--- |
+| `/music/xxx.jpg`（封面） | `HIT` | 从就近边缘节点返回 |
+| `/music/xxx.m4a`（音频） | `DYNAMIC` | **每次请求都回源**，播放等待明显变长 |
+
+两个文件在同一个目录、同一条 `Cache-Control: public, max-age=31536000` 下，差别只在扩展名。
+
+解决办法是在 Cloudflare 后台建一条 **Cache Rule**（免费版可建 10 条）：
+
+**Caching → Cache Rules → Create rule**
+
+- 规则名：`Cache audio`
+- 匹配表达式：`starts_with(http.request.uri.path, "/music/")`
+- 设置：
+  - **Cache eligibility** → `Eligible for cache`
+  - **Edge TTL** → `Ignore cache-control header and use this TTL` → `1 year`
+  - **Browser TTL** → `Respect origin`（保持现有 1 年）
+
+配好后 `/music/*.m4a` 的 `cf-cache-status` 应变为 `HIT`。首次访问某区域仍会回源一次，之后该区域即全部命中。
 
 ### 发版与缓存（重要）
 

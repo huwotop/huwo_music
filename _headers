@@ -1,11 +1,22 @@
 # Cloudflare Pages / Netlify 响应头配置
 #
 # 缓存策略说明：
-# - /music/* 音频文件体积大且内容不变，长缓存（1 年）。
+# - /music/* 音频文件体积大且内容不变，希望长缓存（1 年）。
+#            ⚠️ 但仅靠这里的 Cache-Control 不够：Cloudflare 只缓存内置扩展名白名单内的
+#               文件，而 .m4a 不在白名单（mp4 在，mp3/m4a 不在）。实测 /music/*.m4a 的
+#               cf-cache-status 是 DYNAMIC（同目录的 .jpg 封面却是 HIT，差别只在扩展名）。
+#               必须另在后台建 Cache Rule，否则每个用户每次播放都回源：
+#               Caching → Cache Rules → 新建规则
+#                 匹配表达式：starts_with(http.request.uri.path, "/music/")
+#                 设置 Edge TTL：Ignore cache-control header and use this TTL → 1 year
+#                 设置 Cache eligibility：Eligible for cache
 # - /img/*   图标等资源保留 7 天；替换图片后请同步修改引用处的 ?v= 版本号，
 #            否则 CDN 与浏览器仍会用旧图（历史上曾把图标缓存成 HTML 达 1 年）。
-# - /js/*、/css/* 不缓存，靠 ETag 协商缓存（304）。这样发版立即可见，
-#            不会再出现「代码已更新但线上仍是旧版」的情况。
+# - /js/*、/css/* 长缓存 1 年（immutable）。它们的引用都带 ?v= 版本号，发版时改版本号即可
+#            立即击穿。历史上曾用 max-age=0, must-revalidate 想做到「发版立即可见」，
+#            结果适得其反：Cloudflare 把 max-age=0 改写成默认 Browser Cache TTL（4 小时），
+#            且 must-revalidate 导致每次请求都回源校验（cf-cache-status: REVALIDATED），
+#            反而拖慢首字节。改为长缓存后边缘可直接 HIT。
 #
 # HTML 的 no-transform（重要，请勿删除）
 # - Cloudflare 的 JavaScript Detections(JSD) 会在每个 HTML 响应末尾注入一段内联
@@ -16,7 +27,7 @@
 #   免费版面板也没有对应开关；关掉 Bot Fight Mode 并不会关掉 JSD。
 # - 官方给出的退出方式：当响应包含 Cache-Control: no-transform 时，Cloudflare 不再注入 JSD。
 #   出处：https://developers.cloudflare.com/cloudflare-challenges/challenge-types/javascript-detections/
-# - 代价：Cloudflare 可能跳过对 HTML 的压缩（本站首页约 2.9 KB，影响可忽略）；
+# - 代价：Cloudflare 会跳过对 HTML 的压缩（首页约 2.9 KB → 1.9 KB 未压缩，影响可忽略）；
 #   这些页面的 js_detection.passed 会变为 missing —— 原本因被 CSP 拦截就已是拿不到的状态，无实际损失。
 #
 # 注意：本文件修改后需重新部署才会生效，且已缓存的旧响应会按旧 TTL 继续存在，
@@ -33,10 +44,10 @@
   Cache-Control: public, max-age=604800
 
 /js/*
-  Cache-Control: public, max-age=0, must-revalidate
+  Cache-Control: public, max-age=31536000, immutable
 
 /css/*
-  Cache-Control: public, max-age=0, must-revalidate
+  Cache-Control: public, max-age=31536000, immutable
 
 # HTML 页面：no-transform 阻止 Cloudflare 注入 JS Detections，并保持协商缓存
 /
