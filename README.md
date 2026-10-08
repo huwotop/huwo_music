@@ -1,10 +1,11 @@
 # 虎窝音乐
 
-一个基于 [APlayer](https://github.com/DIYgod/APlayer) 的静态音乐播放器，通过 IPFS 网关获取音乐文件、歌词和封面图片，支持歌词同步显示。
+一个基于 [APlayer](https://github.com/DIYgod/APlayer) 的静态音乐播放器。音乐文件、歌词与封面图片默认放在本地 `music/` 目录，也支持通过 `config.js` 指向远程歌单 URL，并支持歌词同步显示。
 
 ## 功能特性
 
-- 通过 IPFS 网关获取音乐文件、歌词和封面图片
+- 本地 `music/` 目录托管音乐文件、歌词和封面图片
+- 支持通过 `config.js` 指向远程歌单 JSON
 - 支持完整的进度条拖动控制
 - 歌词同步显示
 - 动态主题色（根据封面自动提取）
@@ -31,37 +32,52 @@
 ### 本地运行
 
 ```bash
-# 进入项目目录
-cd 虎窝音乐
+# 1. 把音频（.m4a / .mp3 / .flac / .aac）和同名的 .lrc 歌词、.jpg 封面放进 music/ 目录
+#    文件名格式：歌手 - 歌曲.m4a  /  歌手 - 歌曲.lrc  /  歌手 - 歌曲.jpg
 
-# 使用 Python 启动服务器
-python -m http.server 8000
+# 2. 扫描 music/ 目录生成歌单
+python3 generate_musiclist.py
 
-# 或使用 Node.js
-npx serve .
+# 3. 启动本地服务器
+python3 -m http.server 8000
 
 # 访问 http://localhost:8000
 ```
+
+> 每次增删歌曲后都要重新执行 `generate_musiclist.py`，否则新歌不会出现在播放器中。
 
 ## 配置说明
 
 ### 音乐列表
 
-编辑 `musiclist.json` 文件，直接填写完整的 IPFS URL，格式如下：
+`musiclist.json` 由 `generate_musiclist.py` 扫描 `music/` 目录自动生成，一般不需要手工编辑：
 
 ```json
 [
   {
-    "name": "歌曲名称",
-    "artist": "歌手",
-    "url": "https://gateway.ipfsscan.io/ipfs/<CID>/歌曲名称 - 歌手.flac",
-    "cover": "https://gateway.ipfsscan.io/ipfs/<CID>/歌曲名称 - 歌手.jpg",
-    "lrc": "https://gateway.ipfsscan.io/ipfs/<CID>/歌曲名称 - 歌手.lrc"
+    "name": "F4",
+    "artist": "流星雨",
+    "url": "./music/F4%20-%20%E6%B5%81%E6%98%9F%E9%9B%A8.m4a",
+    "cover": "./music/F4%20-%20%E6%B5%81%E6%98%9F%E9%9B%A8.jpg",
+    "lrc": "./music/F4%20-%20%E6%B5%81%E6%98%9F%E9%9B%A8.lrc"
   }
 ]
 ```
 
-将 `<CID>` 替换为你的 IPFS 目录 CID。歌曲文件、歌词和封面图片均存放在该 CID 根目录下，文件名格式为 `歌曲名 - 歌手名.扩展名`。
+脚本按文件名中**第一个** ` - ` 切分：**左半部分写入 `name`，右半部分写入 `artist`**。
+播放器列表按 `name - artist` 展示，因此显示顺序与文件名完全一致。`url` / `cover` / `lrc` 均为相对路径，非 ASCII 字符已做 URL 编码。
+
+如果没有对应的封面或歌词文件，对应字段会是空字符串，播放器会回退到默认封面并显示「暂无歌词」。
+
+### config.js
+
+```js
+var remoteMusic = "./musiclist.json"
+```
+
+- 指向一个歌单 JSON（本地路径或远程 URL）：使用该歌单作为播放列表。
+- 留空或文件不存在：回退到 `Meting.js` + `meting-api/` 的在线歌单方案。
+- 也可以通过 URL 参数临时指定远程歌单：`?id=<歌单ID>&server=<netease|tencent>`，此模式下会强制走 Meting。
 
 ### 部署到 Cloudflare Pages
 
@@ -88,22 +104,27 @@ npx serve .
 
 ```
 虎窝音乐/
-├── css/                    # 样式文件
-│   ├── APlayer.css         # APlayer 播放器样式
-│   └── main.css            # 自定义样式
-├── img/                    # 封面图片资源（站点图标等）
-├── js/                     # JavaScript 文件
-│   ├── APlayer.min.js      # APlayer 核心库
-│   ├── color-thief.min.js  # 颜色提取库
-│   ├── localEngine.js       # IPFS 音乐引擎
-│   ├── Meting.js            # MetingJS 音乐API（备选）
-│   └── main.js             # 主逻辑
-├── meting-api/             # MetingAPI 服务端（备选）
-├── config.js               # 音乐列表配置
-├── index.html              # 主页面
-├── musiclist.json          # 音乐列表（IPFS 完整 URL）
-└── README.md              # 项目说明
+├── css/                      # 样式文件
+│   ├── APlayer.css           # APlayer 播放器样式
+│   └── main.css              # 自定义样式
+├── img/                      # 站点图标与默认背景（icon.webp / icon-r*.webp / cover.webp）
+├── js/                       # JavaScript 文件
+│   ├── APlayer.min.js        # APlayer 核心库（已定制，内部会调用 heo.* 方法）
+│   ├── color-thief.min.js    # 颜色提取库
+│   ├── localEngine.js        # 本地音乐引擎（读取 musiclist.json）
+│   ├── Meting.js             # MetingJS 音乐 API（备选）
+│   └── main.js               # 主逻辑
+├── music/                    # 音乐文件 + 同名 .lrc 歌词 + 同名 .jpg 封面
+├── meting-api/               # MetingAPI 服务端（备选，需 PHP 环境）
+├── config.js                 # 歌单来源配置（remoteMusic）
+├── generate_musiclist.py     # 扫描 music/ 生成 musiclist.json
+├── index.html                # 主页面
+├── musiclist.json            # 自动生成的音乐列表
+├── _headers                  # Cloudflare Pages 响应头（Range 支持 + 缓存）
+└── README.md                 # 项目说明
 ```
+
+> `js/APlayer.min.js` 是为本项目定制过的构建版本：它在切歌时会直接调用 `heo.scrollLyric()`、`heo.addLyricClickEvent()`、`heo.updateThemeColorWithImage()` 等全局方法。请勿用上游原版 APlayer 直接替换，否则歌词滚动与主题色会失效。
 
 ## 许可证
 

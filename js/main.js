@@ -15,9 +15,11 @@ if (!Element.prototype.closest) {
 }
 console.log("\n %c HeoMusic 开源静态音乐播放器 %c https://github.com/zhheo/HeoMusic \n", "color: #fadfa3; background: #030307; padding:5px 0;", "background: #fadfa3; padding:5px 0;")
 var local = false;
+var localMusic; // 本地歌单，由远程 JSON 加载后填充
 var isScrolling = false; // 添加全局变量 isScrolling，默认为 false
 var scrollTimer = null; // 添加定时器变量
 var animationFrameId = null; // 添加变量用于跟踪动画帧ID
+var lyricClickBound = false; // 歌词点击监听是否已绑定（避免随切歌重复累积）
 
 if (typeof userId === 'undefined') {
   var userId = "8152976493"; // 替换为实际的默认值
@@ -46,17 +48,29 @@ if (typeof remoteMusic !== 'undefined' && remoteMusic) {
   loadMusicScript();
 }
 
+// 通过 URL 参数指定歌单时（?id=xxx&server=xxx），必须走 Meting 模式
+function useRemotePlaylistByParams() {
+  var p = new URLSearchParams(window.location.search);
+  return !!(p.get('id') && p.get('server'));
+}
+
+function loadScript(src) {
+  var script = document.createElement('script');
+  script.src = src;
+  document.body.appendChild(script);
+}
+
 function loadMusicScript() {
-  if (typeof localMusic === 'undefined' || !Array.isArray(localMusic) || localMusic.length === 0) {
-    // 如果 localMusic 为空数组或未定义，加载 Meting2.min.js
-    var script = document.createElement('script');
-    script.src = './js/Meting.js';
-    document.body.appendChild(script);
+  // 指定了远程歌单参数，或本地歌单为空，都改用 Meting.js
+  var useMeting = useRemotePlaylistByParams() ||
+    typeof localMusic === 'undefined' ||
+    !Array.isArray(localMusic) ||
+    localMusic.length === 0;
+
+  if (useMeting) {
+    loadScript('./js/Meting.js');
   } else {
-    // 否则加载 localEngine.js
-    var script = document.createElement('script');
-    script.src = './js/localEngine.js';
-    document.body.appendChild(script);
+    loadScript('./js/localEngine.js');
     local = true;
   }
 }
@@ -68,6 +82,7 @@ var volume = 0.8;
 const params = new URLSearchParams(window.location.search);
 
 var heo = {
+  _metadataKey: null, // 上一次写入媒体会话的元数据标识，用于去重
   // 处理滚动和触摸事件的通用方法
   handleScrollOrTouch: function(event, isTouchEvent) {
     // 检查事件的目标元素是否在相关区域内部
@@ -198,39 +213,16 @@ var heo = {
     }
   },
 
-  bindEvents: function () {
-    var e = this;
-    // 添加歌词点击件
-    if (this.lrc) {
-      this.template.lrc.addEventListener('click', function (event) {
-        // 确保点击的是歌词 p 元素
-        var target = event.target;
-        if (target.tagName.toLowerCase() === 'p') {
-          // 获取所有歌词元素
-          var lyrics = e.template.lrc.getElementsByTagName('p');
-          // 找到被点击歌词的索引
-          for (var i = 0; i < lyrics.length; i++) {
-            if (lyrics[i] === target) {
-              // 获取对应时间并跳转
-              if (e.lrc.current[i]) {
-                var time = e.lrc.current[i][0];
-                e.seek(time);
-                if (e.paused) {
-                  e.play();
-                }
-              }
-              break;
-            }
-          }
-        }
-      });
-    }
-  },
-  // 添加新方法处理歌词点击
+  // 处理歌词点击跳转
   addLyricClickEvent: function () {
+    // APlayer 每次切歌都会调用本方法，这里只允许绑定一次，避免监听器累积
+    if (lyricClickBound) {
+      return;
+    }
     const lrcContent = document.querySelector('.aplayer-lrc-contents');
 
     if (lrcContent) {
+      lyricClickBound = true;
       lrcContent.addEventListener('click', function (event) {
         if (event.target.tagName.toLowerCase() === 'p') {
           const lyrics = lrcContent.getElementsByTagName('p');
@@ -273,6 +265,13 @@ var heo = {
         songName = audio.name;
         songArtist = audio.artist;
       }
+      // timeupdate 触发频率很高（约每秒 4 次），内容未变化时无需重建元数据
+      const metadataKey = `${songName}|${songArtist}|${audio.album}|${coverUrl}`;
+      if (metadataKey === heo._metadataKey) {
+        return;
+      }
+      heo._metadataKey = metadataKey;
+
       navigator.mediaSession.metadata = new MediaMetadata({
         title: songName,
         artist: songArtist,
@@ -293,11 +292,7 @@ var heo = {
   },
   // 响应 MediaSession 标准媒体交互
   setupMediaSessionHandlers: function (aplayer) {
-    // APlayer 内部的拖动修复已在 APlayer.min.js 中实现
-    // 进度条拖动时通过 _dragTargetPercent/_dragTargetTime/_dragPendingSeek 标志
-    // 在 seeking/seeked/durationchange 事件中正确处理状态
-    // 这里不需要额外的修复代码
-
+    // 进度条拖动由 APlayer 内部处理，这里只注册 MediaSession 标准媒体动作
     if ('mediaSession' in navigator) {
       navigator.mediaSession.setActionHandler('play', () => {
         aplayer.play();
@@ -407,39 +402,34 @@ window.addEventListener('aplayerloaded', function () {
   heo.addLyricClickEvent();
   //空格控制音乐
   document.addEventListener("keydown", function (event) {
-    //暂停开启音乐
-    if (event.code === "Space") {
-      event.preventDefault();
-      ap.toggle();
-
-    };
-    //切换下一曲
-    if (event.keyCode === 39) {
-      event.preventDefault();
-      ap.skipForward();
-
-    };
-    //切换上一曲
-    if (event.keyCode === 37) {
-      event.preventDefault();
-      ap.skipBack();
-
-    }
-    //增加音量
-    if (event.keyCode === 38) {
-      if (volume <= 1) {
-        volume += 0.1;
+    switch (event.code) {
+      case "Space":
+        // 暂停 / 继续
+        event.preventDefault();
+        ap.toggle();
+        break;
+      case "ArrowRight":
+        // 下一曲
+        event.preventDefault();
+        ap.skipForward();
+        break;
+      case "ArrowLeft":
+        // 上一曲
+        event.preventDefault();
+        ap.skipBack();
+        break;
+      case "ArrowUp":
+        // 增加音量（钳制在 0 ~ 1，并做取整避免浮点误差累积）
+        event.preventDefault();
+        volume = Math.min(1, Math.round((volume + 0.1) * 10) / 10);
         ap.volume(volume, true);
-
-      }
-    }
-    //减小音量
-    if (event.keyCode === 40) {
-      if (volume >= 0) {
-        volume += -0.1;
+        break;
+      case "ArrowDown":
+        // 减小音量（钳制在 0 ~ 1，并做取整避免浮点误差累积）
+        event.preventDefault();
+        volume = Math.max(0, Math.round((volume - 0.1) * 10) / 10);
         ap.volume(volume, true);
-
-      }
+        break;
     }
   });
 

@@ -1,3 +1,13 @@
+## 3.8
+修复本地音乐模式下键盘快捷键（空格 / 方向键）与窗口 resize 逻辑失效的问题：`localEngine.js` 未派发 `aplayerloaded` 事件
+修复 CSP 拦截 `tj.huwo.top` 统计脚本的问题
+修复歌词点击监听随切歌重复累积的问题
+修复音量调节在 0 和 1 两端需要多按一次才生效、且内部数值越界的问题
+修复 `?id=&server=` URL 参数歌单在本地模式下静默失效的问题
+清空 `getCustomPlayList()` 注入的占位节点，避免残留无效 DOM
+降低 `timeupdate` 中重复重建 MediaSession 元数据的开销
+清理死代码（`heo.bindEvents`）与失实注释
+
 ## 3.7
 切换音乐时，歌词滚动到顶部
 兼容移动端滚动
