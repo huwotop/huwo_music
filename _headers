@@ -7,8 +7,20 @@
 # - /js/*、/css/* 不缓存，靠 ETag 协商缓存（304）。这样发版立即可见，
 #            不会再出现「代码已更新但线上仍是旧版」的情况。
 #
+# HTML 的 no-transform（重要，请勿删除）
+# - Cloudflare 的 JavaScript Detections(JSD) 会在每个 HTML 响应末尾注入一段内联
+#   <script>（用于加载 /cdn-cgi/challenge-platform/scripts/jsd/main.js）。
+#   该脚本每次请求内容都不同（内嵌随机 r/t token），无法用 CSP hash 放行，
+#   于是持续触发「Executing inline script violates ... script-src」控制台报错。
+# - JSD 由 Bot Fight Mode 自动开启，官方文档明确说明「cannot be disabled」，
+#   免费版面板也没有对应开关；关掉 Bot Fight Mode 并不会关掉 JSD。
+# - 官方给出的退出方式：当响应包含 Cache-Control: no-transform 时，Cloudflare 不再注入 JSD。
+#   出处：https://developers.cloudflare.com/cloudflare-challenges/challenge-types/javascript-detections/
+# - 代价：Cloudflare 可能跳过对 HTML 的压缩（本站首页约 2.9 KB，影响可忽略）；
+#   这些页面的 js_detection.passed 会变为 missing —— 原本因被 CSP 拦截就已是拿不到的状态，无实际损失。
+#
 # 注意：本文件修改后需重新部署才会生效，且已缓存的旧响应会按旧 TTL 继续存在，
-# 首次生效时需在 Cloudflare 后台执行一次 Purge Everything。
+#       首次生效时需在 Cloudflare 后台执行一次 Purge Everything。
 
 /*
   Accept-Ranges: bytes
@@ -25,3 +37,13 @@
 
 /css/*
   Cache-Control: public, max-age=0, must-revalidate
+
+# HTML 页面：no-transform 阻止 Cloudflare 注入 JS Detections，并保持协商缓存
+/
+  Cache-Control: public, max-age=0, must-revalidate, no-transform
+
+/index.html
+  Cache-Control: public, max-age=0, must-revalidate, no-transform
+
+/404.html
+  Cache-Control: public, max-age=0, must-revalidate, no-transform

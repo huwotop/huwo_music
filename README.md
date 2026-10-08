@@ -81,7 +81,7 @@ var remoteMusic = "./musiclist.json"
 
 ### 部署到 Cloudflare Pages
 
-项目通过 `_headers` 文件配置响应头（Range 请求支持 + 缓存策略）：
+项目通过 `_headers` 文件配置响应头（Range 请求支持 + 缓存策略 + 阻止 Cloudflare 注入）：
 
 ```
 /*
@@ -98,11 +98,36 @@ var remoteMusic = "./musiclist.json"
 
 /css/*
   Cache-Control: public, max-age=0, must-revalidate
+
+# HTML：no-transform 阻止 Cloudflare 注入 JS Detections
+/
+  Cache-Control: public, max-age=0, must-revalidate, no-transform
+
+/index.html
+  Cache-Control: public, max-age=0, must-revalidate, no-transform
+
+/404.html
+  Cache-Control: public, max-age=0, must-revalidate, no-transform
 ```
 
 **测试验证**：打开开发者工具 → Network → 播放一首歌曲 → 点击音频请求，确认响应头包含 `Accept-Ranges: bytes`。
 
 > 音频文件必须支持 Range 请求，否则进度条拖动会失效。
+
+#### 为什么 HTML 要加 `no-transform`（请勿删除）
+
+Cloudflare 的 JavaScript Detections（JSD）会往每个 HTML 响应末尾注入一段内联 `<script>`（用于加载 `/cdn-cgi/challenge-platform/scripts/jsd/main.js`）。该脚本每次请求内容都不同（内嵌随机 token），无法用 CSP hash 放行，于是持续触发控制台报错：
+
+```
+Executing inline script violates the following Content Security Policy directive:
+"script-src 'self' …"  The action has been blocked.
+```
+
+JSD 由 Bot Fight Mode 自动开启，官方文档明确说明 **cannot be disabled**，免费版面板也没有对应开关——**关掉 Bot Fight Mode 并不会关掉 JSD**。
+
+官方给出的退出方式就是 `no-transform`：当响应包含该指令时，Cloudflare 不再注入 JSD 脚本（[官方文档](https://developers.cloudflare.com/cloudflare-challenges/challenge-types/javascript-detections/)）。代价是 Cloudflare 可能跳过对 HTML 的压缩（首页约 2.9 KB，影响可忽略），且这些页面的 `js_detection.passed` 会变为 `missing`——而它原本因被 CSP 拦截就已是拿不到的状态，无实际损失。
+
+> 另注：官方文档说明 JSD **不支持通过 `<meta>` 标签设置的 CSP nonce**，因此「改用 nonce 放行」在本项目走不通（本项目的 CSP 写在 `<meta>` 里）。
 
 ### 发版与缓存（重要）
 
