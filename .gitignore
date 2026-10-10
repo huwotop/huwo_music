@@ -1,2 +1,11 @@
 .DS_Store
 .workbuddy/
+
+# 音频文件不入库
+# 音频已托管在 pone.rs，musiclist.json 的 url 字段指向其直链；
+# 仓库只保留歌单实际引用的封面(.jpg)与歌词(.lrc)。
+music/*.m4a
+music/*.mp3
+music/*.flac
+music/*.aac
+music/*.wav
