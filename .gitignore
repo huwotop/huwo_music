@@ -2,8 +2,10 @@
 .workbuddy/
 
 # 音频文件不入库
-# 音频已托管在 pone.rs，musiclist.json 的 url 字段指向其直链；
+# 音频已托管在 GitHub Release（tag: music，资产名 001.m4a 起按歌单顺序编号），
+# musiclist.json 的 url 字段指向经 gh-proxy.org 加速的 Release 直链；
 # 仓库只保留歌单实际引用的封面(.jpg)与歌词(.lrc)。
+# 注意：Release 资产名与歌单顺序一一对应，不可手动重命名或删除。
 music/*.m4a
 music/*.mp3
 music/*.flac
